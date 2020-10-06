@@ -60,14 +60,18 @@ function wait_on_workflow {
     sleep $INPUT_WAIT_TIME
     conclusion=$(curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs/${wfid}" \
     	-H "Accept: application/vnd.github.v3+json" \
-    	-H "Authorization: Bearer ${INPUT_TOKEN}" | jq '.conclusion')
+    	-H "Authorization: Bearer ${INPUT_TOKEN}" | jq -r '.conclusion')
+
+    if [ "$conclusion" == "failure" ]; then
+      break
+    fi
   done
 
-  if [[ $conclusion == "\"success\"" ]]
+  if [[ $conclusion == "success" ]]
   then
     echo "Workflow run successful"
   else
-    echo "Workflow run failed"
+    echo "Workflow run failed (conclusion: $conclusion)"
     exit 1
   fi
 }
