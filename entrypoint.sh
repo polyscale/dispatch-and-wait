@@ -51,6 +51,12 @@ function wait_on_workflow {
   stime=$(date +%s)
   conclusion="null"
 
+  echo "Dispatched workflow run URL:"
+  echo -n "==> "
+  curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs/${workflow_runid}" \
+    -H "Accept: application/vnd.github.v3+json" \
+    -H "Authorization: Bearer ${INPUT_TOKEN}" | jq -r '.html_url'
+
   while [[ $conclusion == "null" ]]
   do
     rtime=$(( `date +%s` - $stime ))
@@ -68,12 +74,6 @@ function wait_on_workflow {
       break
     fi
   done
-
-  echo "Dispatched workflow run URL:"
-  echo -n "==> "
-  curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs/${workflow_runid}" \
-    -H "Accept: application/vnd.github.v3+json" \
-    -H "Authorization: Bearer ${INPUT_TOKEN}" | jq -r '.html_url'
 
   if [[ $conclusion == "success" ]]
   then
