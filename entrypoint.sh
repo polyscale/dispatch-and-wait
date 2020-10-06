@@ -51,7 +51,7 @@ function wait_on_workflow {
 
   while [[ $conclusion == "null" ]]
   do
-    rtime=$(( `data +%s` - $stime ))
+    rtime=$(( `date +%s` - $stime ))
     if [[ "$rtime" -ge "$INPUT_MAX_TIME" ]]
     then
       echo "Time limit exceeded"
