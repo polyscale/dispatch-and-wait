@@ -35,13 +35,15 @@ function ensure_workflow {
       -H "Accept: application/vnd.github.v3+json" \
       -H "Authorization: Bearer ${INPUT_TOKEN}" | jq ".workflow_runs[] | select(.run_number==$workflow_expect_runid) | .id")
 
-    if [ -z "$workflow_runid" ]; then
-      >&2 echo "Repository dispatch failed! No workflow run id found."
-      exit 1
-    fi
-
+    [ -z "$workflow_runid" ] || break
     sleep 2
   done
+
+  if [ -z "$workflow_runid" ]; then
+    >&2 echo "No workflow run id found. Repository dispatch failed!"
+    exit 1
+  fi
+
   echo "Workflow run id is ${workflow_runid}"
 }
 
@@ -58,7 +60,7 @@ function wait_on_workflow {
       exit 1
     fi
     sleep $INPUT_WAIT_TIME
-    conclusion=$(curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs/${wfid}" \
+    conclusion=$(curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs/${workflow_runid}" \
     	-H "Accept: application/vnd.github.v3+json" \
     	-H "Authorization: Bearer ${INPUT_TOKEN}" | jq -r '.conclusion')
 
@@ -67,11 +69,17 @@ function wait_on_workflow {
     fi
   done
 
+  echo "Dispatched workflow run URL:"
+  echo -n "==> "
+  curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs/${workflow_runid}" \
+    -H "Accept: application/vnd.github.v3+json" \
+    -H "Authorization: Bearer ${INPUT_TOKEN}" | jq -r '.html_url'
+
   if [[ $conclusion == "success" ]]
   then
-    echo "Workflow run successful"
+    echo "Suceeded"
   else
-    echo "Workflow run failed (conclusion: $conclusion)"
+    echo "Failed (conclusion: $conclusion)!"
     exit 1
   fi
 }
