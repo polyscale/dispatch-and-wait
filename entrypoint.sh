@@ -1,5 +1,15 @@
 function trigger_workflow {
   echo "Triggering ${INPUT_EVENT_TYPE} in ${INPUT_OWNER}/${INPUT_REPO}"
+
+  workflow_expect_runid=$(curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs?event=repository_dispatch" \
+        -H "Accept: application/vnd.github.v3+json" \
+        -H "Authorization: Bearer ${INPUT_TOKEN}" | jq '.workflow_runs[0].run_number')
+
+  if [ "$workflow_expect_runid" = "null" ]; then
+    workflow_expect_runid=0
+  fi
+  workflow_expect_runid=$(( $workflow_expect_runid + 1))
+
   resp=$(curl -X POST -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/dispatches" \
     -H "Accept: application/vnd.github.v3+json" \
     -H "Content-Type: application/json" \
@@ -16,44 +26,33 @@ function trigger_workflow {
   fi
 }
 
-function find_workflow {
-  counter=0
-  while [[ true ]]
+function ensure_workflow {
+  max_wait=10
+  stime=$(date +%s)
+  while [ $(( `date +%s` - $stime )) -lt $max_wait ]
   do
-    counter=$(( $counter + 1 ))
-    workflow=$(curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs?event=repository_dispatch" \
+    workflow_runid=$(curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs?event=repository_dispatch" \
       -H "Accept: application/vnd.github.v3+json" \
-      -H "Authorization: Bearer ${INPUT_TOKEN}" | jq '.workflow_runs[0]')
+      -H "Authorization: Bearer ${INPUT_TOKEN}" | jq ".workflow_runs[] | select(.run_number==$workflow_expect_runid) | .id")
 
-    wtime=$( echo $(echo $workflow | jq '.created_at') | cut -c13-20 )
-    atime=$(date -u +%T)
-    tdif=$(( $(date -d "$atime" +"%s") - $(date -d "$wtime" +"%s") ))
-    
-    if [[ "$tdif" -gt "10" ]]
-    then
-      if [[ "$counter" -gt "3" ]]
-      then
-        echo "Workflow not found"
-        exit 1
-      else
-        sleep 2
-      fi
-    else
-      break
+    if [ -z "$workflow_runid" ]; then
+      >&2 echo "Repository dispatch failed! No workflow run id found."
+      exit 1
     fi
-  done
 
-  wfid=$(echo $workflow | jq '.id')
-  conclusion=$(echo $workflow | jq '.conclusion')
-  
-  echo "Workflow id is ${wfid}"
+    sleep 2
+  done
+  echo "Workflow run id is ${workflow_runid}"
 }
 
 function wait_on_workflow {
-  counter=0
+  stime=$(date +%s)
+  conclusion="null"
+
   while [[ $conclusion == "null" ]]
   do
-    if [[ "$counter" -ge "$INPUT_MAX_TIME" ]]
+    rtime=$(( `data +%s` - $stime ))
+    if [[ "$rtime" -ge "$INPUT_MAX_TIME" ]]
     then
       echo "Time limit exceeded"
       exit 1
@@ -62,7 +61,6 @@ function wait_on_workflow {
     conclusion=$(curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs/${wfid}" \
     	-H "Accept: application/vnd.github.v3+json" \
     	-H "Authorization: Bearer ${INPUT_TOKEN}" | jq '.conclusion')
-    counter=$(( $counter + $INPUT_WAIT_TIME ))
   done
 
   if [[ $conclusion == "\"success\"" ]]
@@ -76,7 +74,7 @@ function wait_on_workflow {
 
 function main {
   trigger_workflow
-  find_workflow
+  ensure_workflow
   wait_on_workflow
 }
 
