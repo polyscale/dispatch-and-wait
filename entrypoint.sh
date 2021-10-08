@@ -26,7 +26,7 @@ function trigger_workflow {
 }
 
 function ensure_workflow {
-  max_wait=30
+  max_wait=300
   stime=$(date +%s)
   while [ $(($(date +%s) - $stime)) -lt $max_wait ]; do
     workflow_runid=$(curl -s "https://api.github.com/repos/${INPUT_OWNER}/${INPUT_REPO}/actions/runs?event=repository_dispatch" \
@@ -34,7 +34,7 @@ function ensure_workflow {
       -H "Authorization: Bearer ${INPUT_TOKEN}" | jq ".workflow_runs[] | select(.run_number==$workflow_expect_runid) | .id")
 
     [ -z "$workflow_runid" ] || break
-    sleep 2
+    sleep 5
   done
 
   if [ -z "$workflow_runid" ]; then
