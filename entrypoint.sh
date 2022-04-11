@@ -17,7 +17,7 @@ function trigger_workflow {
     -d "{\"event_type\": \"${INPUT_EVENT_TYPE}\", \"client_payload\": ${INPUT_CLIENT_PAYLOAD} }")
 
   if [ -z "$resp" ]; then
-    sleep 2
+    sleep 30
   else
     echo "Workflow failed to trigger"
     echo "$resp"
